@@ -69,6 +69,3 @@ Bifrost/
 ├── icons/               # 추출된 아이콘 저장소
 └── build/ & dist/       # 빌드 결과물 디렉토리
 ```
-
----
-**AntiGravity Portfolio** - *Efficiency meets Aesthetics*
