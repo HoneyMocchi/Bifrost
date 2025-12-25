@@ -1,0 +1,89 @@
+{
+    "settings": {
+        "always_on_top": true,
+        "group_order": [
+            "홈",
+            "2",
+            "3",
+            "4"
+        ],
+        "window_geometry": {
+            "x": -263,
+            "y": 1537,
+            "w": 257,
+            "h": 294
+        },
+        "group_shortcuts": {
+            "2": "2",
+            "홈": "1",
+            "3": "3",
+            "4": "4"
+        }
+    },
+    "apps": [
+        {
+            "name": "다운로드",
+            "group": "홈",
+            "type": "auto",
+            "action": "C:/Users/HKP/Downloads",
+            "icon": "",
+            "shortcut": "Q"
+        },
+        {
+            "name": "Naver",
+            "group": "홈",
+            "type": "auto",
+            "action": "https://www.naver.com/",
+            "icon": "naver.jpg",
+            "shortcut": "W"
+        },
+        {
+            "name": "유튭",
+            "group": "홈",
+            "type": "auto",
+            "action": "https://www.youtube.com/",
+            "icon": "유튜브.png",
+            "shortcut": "E"
+        },
+        {
+            "name": "계산기",
+            "group": "홈",
+            "type": "auto",
+            "action": "C:/Windows/System32/calc.exe",
+            "icon": "auto_calc.exe.png",
+            "shortcut": "R"
+        },
+        {
+            "name": "작업관리자",
+            "group": "홈",
+            "type": "auto",
+            "action": "C:/Windows/System32/Taskmgr.exe",
+            "icon": "auto_Taskmgr.exe.png",
+            "shortcut": ""
+        },
+        {
+            "name": "꿀캠저장",
+            "group": "홈",
+            "type": "auto",
+            "action": "C:\\HKP\\OneDrive - 계원예술대학교\\문서\\Honeycam",
+            "icon": "",
+            "shortcut": ""
+        },
+        {
+            "name": "Excalibur",
+            "group": "홈",
+            "type": "auto",
+            "action": "C:\\HKP\\OneDrive - 계원예술대학교\\Portfolio\\AntiGravity\\Excalibur",
+            "icon": "",
+            "shortcut": ""
+        },
+        {
+            "name": "MasisSample",
+            "group": "홈",
+            "type": "auto",
+            "action": "C:/HKP/OneDrive - 계원예술대학교/Portfolio/MasisSample/MasisSample 5.5/MasisSample.uproject",
+            "icon": "MasisSample.png",
+            "shortcut": ""
+        }
+    ]
+}
