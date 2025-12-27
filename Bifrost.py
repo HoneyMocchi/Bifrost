@@ -104,6 +104,39 @@ def migrate_data():
             except Exception as e:
                 log_error(f"Icon migration failed: {e}")
 
+    # [Force Update Logic] 항상 기본 앱 아이콘은 최신 버전으로 덮어쓰기
+    # 배포판에 포함된 최신 아이콘을 AppData로 강제 복사하여 구버전 아이콘 잔재 문제 해결
+    try:
+        force_update_icons = ["app_icon.png", "app_icon.ico"]
+        
+        # [Path Check]
+        # 1. 개발 환경: EXE_DIR/icons
+        # 2. 배포 환경(Frozen): EXE_DIR/_internal (또는 루트)
+        # PyInstaller OneDir 모드에서는 데이터가 _internal(혹은 루트)에 있음.
+        
+        # 후보 경로들
+        candidates = [
+            os.path.join(EXE_DIR, 'icons'),          # Dev
+            os.path.join(EXE_DIR, '_internal'),      # Dist (OneDir default for 6.0+)
+            EXE_DIR                                  # Dist (Root fallback)
+        ]
+        
+        source_dir = None
+        for c in candidates:
+            # 후보 경로에 아이콘이 하나라도 있으면 채택
+            if os.path.exists(os.path.join(c, "app_icon.ico")):
+                source_dir = c
+                break
+        
+        if source_dir:
+            for icon_name in force_update_icons:
+                src = os.path.join(source_dir, icon_name)
+                dst = os.path.join(ICON_DIR, icon_name)
+                if os.path.exists(src):
+                    shutil.copy2(src, dst)
+    except Exception as e:
+        log_error(f"Force icon update failed: {e}")
+
 # Call migration before anything else
 migrate_data()
 

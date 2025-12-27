@@ -7,6 +7,7 @@ block_cipher = None
 
 # 버전 정보 읽기
 import re
+import os
 version = "v0.0.0"
 with open('Bifrost.py', 'r', encoding='utf-8') as f:
     content = f.read()
@@ -19,7 +20,10 @@ a = Analysis(
     ['Bifrost.py'],
     pathex=[],
     binaries=[],
-    datas=[], 
+    datas=[
+        ('icons/app_icon.ico', '.'),
+        ('icons/app_icon.png', '.')
+    ], 
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -68,7 +72,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icons\\app_icon.ico'],
+    icon='icons\\app_icon.ico',
 )
 
 # [변경점 2] COLLECT 블록 추가 (이게 폴더를 만듭니다)
@@ -77,6 +81,7 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
+
     strip=False,
     upx=True,        # 폴더 내부 파일들도 UPX 압축 시도
     upx_exclude=[],

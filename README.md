@@ -14,7 +14,7 @@
 
 ## 🚀 설치 및 실행
 
-1. **[Releases 페이지](https://github.com/Start-to/AntiGravity/releases)**에서 최신 버전의 **zip 파일**을 다운로드합니다.
+1. **[Releases 페이지](https://github.com/HoneyMocchi/Bifrost/releases)**에서 최신 버전의 **zip 파일**을 다운로드합니다.
 2. 다운로드한 파일의 압축을 해제합니다.
 3. 폴더 내의 `Bifrost.exe` 파일을 찾아 실행합니다.
 
@@ -47,4 +47,3 @@ pyinstaller BifrostLauncher.spec
 *   `icons/`: 아이콘 리소스 폴더
 
 ---
-**AntiGravity** Project by HKP
