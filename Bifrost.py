@@ -21,9 +21,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
 from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint, QRect, QFileInfo, QKeyCombination
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QFont, QDrag, QIcon, QLinearGradient, QBrush, QKeySequence, QFontMetrics
 
-# --- [안전 모드 설정] ---
 # --- [Configuration] ---
-VERSION = "v0.4.2"
+VERSION = "v0.4.3"
 
 # Layout Constants
 APP_WIDTH = 60
@@ -43,20 +42,70 @@ COLOR_ACCENT = "#0A84FF"
 COLOR_TEXT_PRIMARY = "#E0E0E0"
 COLOR_TEXT_SECONDARY = "#777777"
 
+# --- [Paths & Migration Logic] ---
+APPDATA_DIR = os.path.join(os.getenv('LOCALAPPDATA'), 'Bifrost')
+CONFIG_FILE = os.path.join(APPDATA_DIR, 'config.json')
+ICON_DIR = os.path.join(APPDATA_DIR, 'icons')
+ERROR_LOG_FILE = os.path.join(APPDATA_DIR, 'error_log.txt')
+
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    EXE_DIR = os.path.dirname(sys.executable)
 else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    EXE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+DEFAULT_CONFIG = {
+    "settings": {
+        "always_on_top": True,
+        "group_order": ["홈"],
+        "window_geometry": {},
+        "group_shortcuts": {}
+    },
+    "apps": []
+}
 
-CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
-ICON_DIR = os.path.join(BASE_DIR, 'icons')
-ERROR_LOG_FILE = os.path.join(BASE_DIR, 'error_log.txt')
+def migrate_data():
+    """
+    마이그레이션 로직:
+    1. APPDATA_DIR이 없으면 생성.
+    2. APPDATA_DIR/config.json이 없으면:
+       -> EXE_DIR/config.json(구버전 데이터)이 있는지 확인 후 복사.
+       -> EXE_DIR/icons 폴더도 통째로 복사.
+    """
+    if not os.path.exists(APPDATA_DIR):
+        try:
+            os.makedirs(APPDATA_DIR)
+        except: pass
 
-if not os.path.exists(ICON_DIR):
-    try:
-        os.makedirs(ICON_DIR)
-    except: pass
+    if not os.path.exists(ICON_DIR):
+        try:
+            os.makedirs(ICON_DIR)
+        except: pass
+
+    # 글로벌 설정이 없을 때만 마이그레이션 시도 (덮어쓰기 방지)
+    if not os.path.exists(CONFIG_FILE):
+        local_config = os.path.join(EXE_DIR, 'config.json')
+        local_icons = os.path.join(EXE_DIR, 'icons')
+        
+        # 1. Config Migration
+        if os.path.exists(local_config):
+            try:
+                shutil.copy2(local_config, CONFIG_FILE)
+            except Exception as e:
+                log_error(f"Config migration failed: {e}")
+        
+        # 2. Icons Migration
+        if os.path.exists(local_icons):
+            try:
+                for item in os.listdir(local_icons):
+                    s = os.path.join(local_icons, item)
+                    d = os.path.join(ICON_DIR, item)
+                    if os.path.isfile(s):
+                        shutil.copy2(s, d)
+            except Exception as e:
+                log_error(f"Icon migration failed: {e}")
+
+# Call migration before anything else
+migrate_data()
 
 # --- [스타일 시트] ---
 PREMIUM_STYLE = """
@@ -258,7 +307,7 @@ class ConfigManager:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(ConfigManager, cls).__new__(cls)
-            cls._instance.data = {"settings": {}, "apps": []}
+            cls._instance.data = DEFAULT_CONFIG.copy()
             cls._instance.load_config()
         return cls._instance
 
@@ -268,11 +317,20 @@ class ConfigManager:
         else:
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    self.data = json.load(f)
+                    loaded_data = json.load(f)
+                    # Smart Merge
+                    self._merge_config(self.data, loaded_data)
             except Exception as e:
                 log_error(f"Config load error: {e}")
                 self.save_config()
     
+    def _merge_config(self, default, loaded):
+        for key, value in loaded.items():
+            if key in default and isinstance(default[key], dict) and isinstance(value, dict):
+                self._merge_config(default[key], value)
+            else:
+                default[key] = value
+
     def save_config(self):
         try:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -319,6 +377,21 @@ class IconManager:
 
         IconManager._cache[cache_key] = final_icon
         return final_icon
+
+    @staticmethod
+    def import_icon(source_path):
+        """외부 아이콘을 AppData/icons 폴더로 복사하고, 새 파일명을 반환합니다."""
+        if not source_path or not os.path.exists(source_path): return None
+        try:
+            filename = os.path.basename(source_path)
+            # 이름 충돌 방지를 위해 timestamp 추가
+            safe_name = f"custom_{int(time.time())}_{filename}"
+            dest_path = os.path.join(ICON_DIR, safe_name)
+            shutil.copy2(source_path, dest_path)
+            return safe_name
+        except Exception as e:
+            log_error(f"Icon import error: {e}")
+            return None
 
     @staticmethod
     def _create_text_icon_flat(text):
@@ -381,8 +454,8 @@ class IconManager:
     def delete_if_unused(icon_name, all_apps):
         """특정 아이콘이 다른 앱에서 사용되지 않으면 삭제합니다."""
         if not icon_name or not os.path.exists(ICON_DIR): return
-        # 안전 장치: 'auto_'로 시작하는 파일만 삭제 (사용자가 넣은 파일 보호)
-        if not icon_name.startswith("auto_"): return 
+        # 안전 장치: 'auto_' 또는 'custom_'으로 시작하는 파일만 삭제 (사용자가 넣은 파일 보호)
+        if not (icon_name.startswith("auto_") or icon_name.startswith("custom_")): return 
         if icon_name == 'app_icon.png': return # 기본 아이콘 보호
         
         # 다른 앱에서 사용 중인지 확인
@@ -863,31 +936,28 @@ class AppEditDialog(QDialog):
             
     def try_auto_fetch_favicon(self):
         """사용자가 URL을 직접 입력했을 때 파비콘을 가져옵니다."""
-        text = self.action_input.text().strip()
-        if text.startswith("http://") or text.startswith("https://"):
-            # 이미 아이콘이 설정되어 있다면 굳이 덮어쓰지 않음 (선택 사항)
-            # 하지만 사용자가 URL을 바꿨다면 갱신하는 게 맞을 듯.
-            # 패스나 URL 수정 시 동작
-            favicon = IconManager.fetch_favicon(text)
-            if favicon:
-                self.icon_display.setText(favicon)
+        url = self.action_input.text()
+        if (url.startswith("http://") or url.startswith("https://")) and not self.icon_display.text():
+            icon_name = IconManager.fetch_favicon(url)
+            if icon_name:
+                self.icon_display.setText(icon_name)
                 # 이름이 비어있으면 도메인으로 채움
                 if not self.name_input.text():
-                    domain = urllib.parse.urlparse(text).netloc
+                    domain = urllib.parse.urlparse(url).netloc
                     self.name_input.setText(domain)
     def find_folder(self):
-        d = QFileDialog.getExistingDirectory(self, "폴더 선택")
-        if d:
-            self.action_input.setText(d)
-            if not self.name_input.text(): self.name_input.setText(os.path.basename(d))
+        path = QFileDialog.getExistingDirectory(self, "폴더 선택")
+        if path: self.action_input.setText(path)
     def find_icon(self):
-        f, _ = QFileDialog.getOpenFileName(self, "아이콘 이미지 선택", "", "Images (*.png *.jpg *.ico)")
-        if f:
-            base = os.path.basename(f)
-            dest = os.path.join(ICON_DIR, base)
-            try: shutil.copy2(f, dest)
-            except: pass
-            self.icon_display.setText(base)
+        path, _ = QFileDialog.getOpenFileName(self, "아이콘 선택", "", "Images (*.png *.jpg *.jpeg *.ico *.bmp)")
+        if path:
+            # 외부 아이콘을 AppData/icons로 임포트
+            imported_name = IconManager.import_icon(path)
+            if imported_name:
+                self.icon_display.setText(imported_name)
+            else:
+                # 실패 시 그냥 경로라도 넣음 (거의 발생 안 함)
+                self.icon_display.setText(path)
     def reset_icon(self): self.icon_display.clear()
     def clear_shortcut(self):
         self.shortcut_btn.current_key = ""
