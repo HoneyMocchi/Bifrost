@@ -21,10 +21,10 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
 from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint, QRect, QFileInfo, QKeyCombination
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QFont, QDrag, QIcon, QLinearGradient, QBrush, QKeySequence, QFontMetrics
 
-# --- [Configuration] ---
-VERSION = "v0.4.3"
+# --- [설정] ---
+VERSION = "v0.4.4"
 
-# Layout Constants
+# 레이아웃 상수
 APP_WIDTH = 60
 APP_HEIGHT = 80
 ICON_SIZE = 48
@@ -33,7 +33,7 @@ LAYOUT_MARGIN = 2
 LAYOUT_H_SPACING = 4
 LAYOUT_V_SPACING = 2
 
-# Style Constants
+# 스타일 상수
 COLOR_BG = "#1A1A1A"
 COLOR_TAB_BG = "#252525"
 COLOR_TAB_HOVER = "#333333"
@@ -42,7 +42,7 @@ COLOR_ACCENT = "#0A84FF"
 COLOR_TEXT_PRIMARY = "#E0E0E0"
 COLOR_TEXT_SECONDARY = "#777777"
 
-# --- [Paths & Migration Logic] ---
+# --- [경로 및 마이그레이션 로직] ---
 APPDATA_DIR = os.path.join(os.getenv('LOCALAPPDATA'), 'Bifrost')
 CONFIG_FILE = os.path.join(APPDATA_DIR, 'config.json')
 ICON_DIR = os.path.join(APPDATA_DIR, 'icons')
@@ -86,14 +86,14 @@ def migrate_data():
         local_config = os.path.join(EXE_DIR, 'config.json')
         local_icons = os.path.join(EXE_DIR, 'icons')
         
-        # 1. Config Migration
+        # 1. 설정 파일 마이그레이션
         if os.path.exists(local_config):
             try:
                 shutil.copy2(local_config, CONFIG_FILE)
             except Exception as e:
                 log_error(f"Config migration failed: {e}")
         
-        # 2. Icons Migration
+        # 2. 아이콘 마이그레이션
         if os.path.exists(local_icons):
             try:
                 for item in os.listdir(local_icons):
@@ -104,21 +104,20 @@ def migrate_data():
             except Exception as e:
                 log_error(f"Icon migration failed: {e}")
 
-    # [Force Update Logic] 항상 기본 앱 아이콘은 최신 버전으로 덮어쓰기
-    # 배포판에 포함된 최신 아이콘을 AppData로 강제 복사하여 구버전 아이콘 잔재 문제 해결
+    # 기본 앱 아이콘 강제 업데이트
+    # 배포판의 최신 아이콘을 로컬 데이터 폴더로 복사하여 구버전 아이콘 문제 해결
     try:
         force_update_icons = ["app_icon.png", "app_icon.ico"]
         
-        # [Path Check]
+        # 경로 확인
         # 1. 개발 환경: EXE_DIR/icons
         # 2. 배포 환경(Frozen): EXE_DIR/_internal (또는 루트)
-        # PyInstaller OneDir 모드에서는 데이터가 _internal(혹은 루트)에 있음.
         
-        # 후보 경로들
+        # 후보 경로 탐색
         candidates = [
-            os.path.join(EXE_DIR, 'icons'),          # Dev
-            os.path.join(EXE_DIR, '_internal'),      # Dist (OneDir default for 6.0+)
-            EXE_DIR                                  # Dist (Root fallback)
+            os.path.join(EXE_DIR, 'icons'),          # 개발 환경
+            os.path.join(EXE_DIR, '_internal'),      # 배포 환경 (OneDir)
+            EXE_DIR                                  # 배포 환경 (Root)
         ]
         
         source_dir = None
@@ -137,7 +136,7 @@ def migrate_data():
     except Exception as e:
         log_error(f"Force icon update failed: {e}")
 
-# Call migration before anything else
+# 마이그레이션 실행
 migrate_data()
 
 # --- [스타일 시트] ---

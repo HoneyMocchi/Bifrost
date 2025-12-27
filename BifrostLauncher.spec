@@ -55,17 +55,21 @@ a.binaries = [x for x in a.binaries if not any(r in x[0].lower() for r in remove
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# [변경점 1] EXE는 이제 가볍게 실행 스크립트만 담습니다.
+# [변경점 1] 단일 실행 파일(OneFile) 설정
 exe = EXE(
     pyz,
     a.scripts,
-    [], # binaries와 datas를 여기서 뺍니다.
-    exclude_binaries=True, # 중요: 바이너리를 EXE에서 제외합니다.
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
     name='Bifrost',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False, 
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -73,17 +77,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='icons\\app_icon.ico',
-)
-
-# [변경점 2] COLLECT 블록 추가 (이게 폴더를 만듭니다)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-
-    strip=False,
-    upx=True,        # 폴더 내부 파일들도 UPX 압축 시도
-    upx_exclude=[],
-    name=f'Bifrost_{version}', # dist 폴더 안에 생성될 폴더 이름 (버전 포함)
+    version='version_info.txt',
 )
