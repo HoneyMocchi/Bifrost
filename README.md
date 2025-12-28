@@ -14,11 +14,10 @@
 
 ## 🚀 설치 및 실행
 
-1. [Releases 페이지](https://github.com/HoneyMocchi/Bifrost/releases)에서 최신 버전의 **zip 파일**을 다운로드합니다.
-2. 다운로드한 파일의 압축을 해제합니다.
-3. 폴더 내의 `Bifrost.exe` 파일을 찾아 실행합니다.
+1. [Releases 페이지](https://github.com/HoneyMocchi/Bifrost/releases)에서 최신 버전의 **Bifrost.exe 파일**을 다운로드합니다.
+3. 다운받은 `Bifrost.exe` 파일을 실행합니다.
 
-> **팁**: 설정을 초기화하고 싶다면 `%LocalAppData%\Bifrost` 폴더를 삭제하세요.
+> **팁**: 설정을 초기화하고 싶다면 내문서에 `%LocalAppData%\Bifrost` 폴더를 삭제하세요.
 
 ## 🛠️ 개발자 가이드
 
