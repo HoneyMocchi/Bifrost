@@ -9,6 +9,7 @@ import time
 import urllib.request
 import urllib.parse
 import ssl
+import threading
 from functools import partial
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, 
@@ -22,7 +23,7 @@ from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint, QRect, QFileInf
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QFont, QDrag, QIcon, QLinearGradient, QBrush, QKeySequence, QFontMetrics
 
 # --- [설정] ---
-VERSION = "v0.4.4"
+VERSION = "v0.4.5"
 
 # 레이아웃 상수
 APP_WIDTH = 60
@@ -138,6 +139,98 @@ def migrate_data():
 
 # 마이그레이션 실행
 migrate_data()
+
+# --- [자동 업데이트 로직] ---
+def check_version_parse(version_str):
+    try:
+        return [int(x) for x in version_str.replace("v", "").split(".")]
+    except:
+        return [0, 0, 0]
+
+class AutoUpdater:
+    def __init__(self, current_version):
+        self.current_version = current_version
+        self.api_url = "https://api.github.com/repos/HoneyMocchi/Bifrost/releases/latest"
+
+    def check_for_updates(self):
+        try:
+            req = urllib.request.Request(self.api_url, headers={'User-Agent': 'Bifrost-Launcher'})
+            
+            # 인증서 검증 무시 (일부 환경 호환성)
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            with urllib.request.urlopen(req, context=ctx, timeout=5) as res:
+                data = json.loads(res.read().decode())
+                latest_tag = data.get('tag_name', '').strip()
+                if not latest_tag: return None, None
+                
+                curr_parts = check_version_parse(self.current_version)
+                latest_parts = check_version_parse(latest_tag)
+                
+                # 단순 비교 (Major.Minor.Patch)
+                is_newer = False
+                for i in range(len(latest_parts)):
+                    if i >= len(curr_parts):
+                        is_newer = True; break
+                    if latest_parts[i] > curr_parts[i]:
+                        is_newer = True; break
+                    elif latest_parts[i] < curr_parts[i]:
+                        break
+                        
+                if is_newer:
+                    assets = data.get('assets', [])
+                    for asset in assets:
+                         if asset['name'].endswith('.exe'):
+                             return latest_tag, asset['browser_download_url']
+            return None, None
+        except Exception as e:
+            log_error(f"Update check failed: {e}")
+            return None, None
+
+    def perform_update(self, download_url, parent_widget=None):
+        try:
+            # 1. 다운로드
+            new_exe_name = "Bifrost.new.exe"
+            new_exe_path = os.path.join(EXE_DIR, new_exe_name)
+            
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            with urllib.request.urlopen(download_url, context=ctx) as response, open(new_exe_path, 'wb') as out_file:
+                shutil.copyfileobj(response, out_file)
+            
+            # 2. 배치 파일 생성
+            bat_path = os.path.join(EXE_DIR, "update_bifrost.bat")
+            current_exe = sys.executable
+            
+            # 배치 스크립트: 
+            # 1초 대기 -> 기존 파일 삭제 -> 새 파일 이름 변경 -> 실행 -> 배치 삭제
+            bat_content = f"""
+@echo off
+timeout /t 2 /nobreak >nul
+del "{current_exe}"
+move "{new_exe_path}" "{current_exe}"
+explorer "{current_exe}"
+del "%~f0"
+"""
+            with open(bat_path, 'w') as f:
+                f.write(bat_content)
+                
+            # 3. 실행 및 종료
+            # PyInstaller 환경 변수(_MEIPASS2) 제거 후 Explorer를 통해 배치 실행 (확실한 분리)
+            env = os.environ.copy()
+            if '_MEIPASS2' in env:
+                del env['_MEIPASS2']
+                
+            subprocess.Popen(bat_path, shell=True, env=env)
+            QApplication.quit()
+        except Exception as e:
+            if parent_widget:
+                QMessageBox.critical(parent_widget, "업데이트 실패", f"업데이트 중 오류가 발생했습니다:\n{e}")
+            log_error(f"Update execution failed: {e}") 
 
 # --- [스타일 시트] ---
 PREMIUM_STYLE = """
@@ -1048,12 +1141,14 @@ class ShortcutDialog(QDialog):
     def get_shortcut(self): return self.btn.current_key
 
 class BifrostWindow(QMainWindow):
+    update_available = Signal(str, str) # version, url
+
     def __init__(self):
         super().__init__()
         self.config = ConfigManager()
-    def __init__(self):
-        super().__init__()
-        self.config = ConfigManager()
+
+        # 업데이트 시그널 연결
+        self.update_available.connect(self.prompt_update)
         self.setWindowTitle(f"Bifrost {VERSION} HoneyMo") 
         self.resize(400, 650)
         QApplication.instance().setStyleSheet(PREMIUM_STYLE)
@@ -1132,6 +1227,25 @@ class BifrostWindow(QMainWindow):
         self.initialize()
         try: apply_dark_title_bar(int(self.winId()))
         except: pass
+
+        # 업데이트 확인 (비동기)
+        threading.Thread(target=self.run_update_check, daemon=True).start()
+
+    def run_update_check(self):
+        updater = AutoUpdater(VERSION)
+        ver, url = updater.check_for_updates()
+        if ver and url:
+            self.update_available.emit(ver, url)
+
+    def prompt_update(self, new_version, url):
+        reply = QMessageBox.question(
+            self, "업데이트 확인",
+            f"새로운 버전 ({new_version})이 있습니다.\n지금 업데이트하시겠습니까?\n(자동으로 다운로드 후 재시작됩니다)",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            updater = AutoUpdater(VERSION)
+            updater.perform_update(url, self)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -1601,51 +1715,19 @@ class BifrostWindow(QMainWindow):
         except: pass
 
     def show_main_context_menu(self, point):
-        # 탭바나 다른 위젯 위가 아닌 경우에만 표시 (필요 시 로직 정교화)
+        # 탭바나 다른 위젯 위가 아닌 경우 메인메뉴
         menu = QMenu(self)
-        menu.addAction("프리셋 로드", self.load_preset)
+        
+        action_visit = menu.addAction("홈페이지 방문")
+        action_visit.triggered.connect(lambda: threading.Thread(target=self.open_homepage, daemon=True).start())
+        
         menu.exec(self.mapToGlobal(point))
 
-    def load_preset(self):
-        f, _ = QFileDialog.getOpenFileName(self, "프리셋(Config) 선택", "", "JSON Files (*.json)")
-        if not f: return
-        
+    def open_homepage(self):
         try:
-            with open(f, 'r', encoding='utf-8') as json_file:
-                new_data = json.load(json_file)
-            
-            # 유효성 검사 (간단)
-            if 'apps' not in new_data and 'settings' not in new_data:
-                QMessageBox.warning(self, "오류", "유효하지 않은 Bifrost 설정 파일입니다.")
-                return
-                
-            # 안전 장치 1: 확인
-            reply = QMessageBox.question(
-                self, "프리셋 로드 확인", 
-                "현재 설정이 선택한 프리셋으로 덮어씌워집니다.\n계속하시겠습니까?\n(현재 설정은 자동으로 백업됩니다)",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.No: return
-            
-            # 안전 장치 2: 자동 백업
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            backup_name = f"config_backup_{timestamp}.json"
-            backup_path = os.path.join(BASE_DIR, backup_name)
-            try:
-                shutil.copy2(CONFIG_FILE, backup_path)
-            except Exception as e:
-                log_error(f"Backup failed: {e}")
-                QMessageBox.critical(self, "오류", f"백업 생성에 실패했습니다. 작업을 중단합니다.\n{e}")
-                return
-
-            # 적용
-            self.config.data = new_data
-            self.config.save_config()
-            self.reload_ui()
-            QMessageBox.information(self, "완료", f"프리셋이 로드되었습니다.\n현재 설정은 '{backup_name}'에 백업되었습니다.")
-            
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"피리셋 로드 중 오류 발생:\n{e}")
+            os.startfile("https://github.com/HoneyMocchi/Bifrost")
+        except:
+            subprocess.Popen("start https://github.com/HoneyMocchi/Bifrost", shell=True)
 
 if __name__ == "__main__":
     try:
