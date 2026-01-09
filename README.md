@@ -1,7 +1,9 @@
 # Bifrost
 
 **Bifrost**는 Python으로 제작된 데스크탑 런처입니다.
-자주 사용하는 애플리케이션, 폴더, 웹사이트를 그룹별로 효율적으로 관리하고 빠르게 실행하세요.
+자주 사용하는 애플리케이션, 폴더, 웹사이트를 그룹별로 효율적으로 관리하고 빠르게 실행할 수 있습니다.
+
+![Image](https://github.com/user-attachments/assets/c510077b-0c8d-44d8-b6b8-7daeeed1af3a)
 
 
 ## ✨ 주요 기능
@@ -20,6 +22,10 @@
 3. 다운받은 `Bifrost.exe` 파일을 실행합니다.
 
 > **팁**: 설정을 초기화하고 싶다면 내문서에 `%LocalAppData%\Bifrost` 폴더를 삭제하세요.
+
+
+
+
 
 
 
